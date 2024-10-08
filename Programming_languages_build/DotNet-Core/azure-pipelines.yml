@@ -1,0 +1,71 @@
+trigger:
+- main
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildJob
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: echo "Building the application"
+      displayName: 'Build'
+    - script: 'dotnet --info'
+      displayName: 'Command Line Script'
+    - task: UseDotNet@2
+      displayName: 'install dotnet 6'
+      inputs:
+        version: 6.x
+
+    - script: 'dotnet --info'
+      displayName: 'Command Line Script'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet restore'
+      inputs:
+        command: restore
+        projects: ./akvwebapp.csproj
+        arguments: '--configuration Release'
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet build'
+      inputs:
+        command: build
+        projects: ./akvwebapp.csproj
+        arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)'
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet test'
+      inputs:
+        command: test
+        projects: ./akvwebapp.csproj
+        arguments: '--configuration Release'
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Pipeline Artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+        artifact: drop
+
+
+- stage: deploy
+  jobs:
+  - job: deployment_dev
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+    - task: DownloadPipelineArtifact@2
+      inputs:
+        artifact: drop
+        patterns: '**'
+        path: $(Build.SourcesDirectory)/bin
+    - script: | 
+        cd $(Build.SourcesDirectory)/bin
+        ls -la
+        pwd
+        tree
+      displayName: ' chekcing file path'
+    - task: AzureRmWebAppDeployment@4
+      displayName: 'Azure App Service Deploy: balaaaa'
+      inputs:
+        azureSubscription: 'bala-service-connection'
+        appType: webAppLinux
+        WebAppName: balaaaa
+        packageForLinux: '$(Build.SourcesDirectory)/bin'
